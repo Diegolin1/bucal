@@ -128,6 +128,10 @@ html, body {
   mask-image: radial-gradient(ellipse at 50% 80%, black 30%, transparent 70%);
 }
 
+#viewport.grid-off::after {
+  opacity: 0;
+}
+
 /* Controls hint */
 #controls-hint {
   position: absolute;

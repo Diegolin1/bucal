@@ -31,7 +31,10 @@ const STATE = {
   showTab:     true,
   gripType:    0, // 0:Diamond, 1:Lines, 2:Dots, 3:None
   logoTex:     null,
-  logoScale:   1.0
+  logoImage:   null,
+  logoCanvas:  null,
+  logoScale:   1.0,
+  wrapGrid:    true
 };
 
 const RENDER_PRESETS = {
@@ -80,6 +83,8 @@ window.addEventListener('DOMContentLoaded', () => {
     initThree();
     buildMouthguard();
     animate();
+    const vp = document.getElementById('viewport');
+    if (vp) vp.classList.toggle('grid-off', !STATE.wrapGrid);
     setTimeout(hideLoading, 500);
   } catch (err) {
     console.error("Error inicializando:", err);
@@ -389,23 +394,37 @@ function getTripoInnerParams(p) {
   };
 }
 
+function getTripoGelParams(p) {
+  return {
+    ...p,
+    archWidth: p.archWidth + 1.2,
+    archDepth: p.archDepth + 0.8,
+    guardHeight: p.guardHeight + 1.0,
+    labialWall: p.labialWall + 0.9,
+    palatalWall: p.palatalWall + 0.7,
+    channelW: p.channelW + 0.4,
+    channelD: p.channelD
+  };
+}
+
 function createTripoMaterials(p) {
   const roughTex = getMicroRoughnessTexture();
   const bumpTex = getFineNoiseTexture();
   const normalTex = getMicroNormalTexture();
   const outerColor = new THREE.Color(p.color1);
-  const innerColor = new THREE.Color(p.color2).lerp(outerColor, 0.35);
+  const innerColor = outerColor.clone().multiplyScalar(0.98);
 
   const outer = new THREE.MeshPhysicalMaterial({
     color: outerColor,
     metalness: 0.0,
     roughness: 0.22,
-    transmission: 0.6,
+    transmission: 0.22,
     ior: 1.46,
     transparent: true,
+    opacity: 0.92,
     clearcoat: 0.6,
     clearcoatRoughness: 0.2,
-    envMapIntensity: 1.2,
+    envMapIntensity: 1.0,
     bumpMap: bumpTex,
     bumpScale: 0.03,
     roughnessMap: roughTex,
@@ -418,12 +437,13 @@ function createTripoMaterials(p) {
     color: innerColor,
     metalness: 0.0,
     roughness: 0.36,
-    transmission: 0.25,
+    transmission: 0.08,
     ior: 1.46,
     transparent: true,
+    opacity: 0.96,
     clearcoat: 0.2,
     clearcoatRoughness: 0.35,
-    envMapIntensity: 0.6,
+    envMapIntensity: 0.5,
     bumpMap: bumpTex,
     bumpScale: 0.02,
     roughnessMap: roughTex,
@@ -433,6 +453,32 @@ function createTripoMaterials(p) {
   });
 
   return { outer, inner };
+}
+
+function createTripoGelMaterial(p) {
+  const roughTex = getMicroRoughnessTexture();
+  const bumpTex = getFineNoiseTexture();
+  const normalTex = getMicroNormalTexture();
+  const gelColor = new THREE.Color(p.color1);
+
+  return new THREE.MeshPhysicalMaterial({
+    color: gelColor,
+    metalness: 0.0,
+    roughness: 0.18,
+    transmission: 0.18,
+    ior: 1.46,
+    transparent: true,
+    opacity: 0.95,
+    clearcoat: 0.9,
+    clearcoatRoughness: 0.12,
+    envMapIntensity: 1.1,
+    bumpMap: bumpTex,
+    bumpScale: 0.025,
+    roughnessMap: roughTex,
+    normalMap: normalTex,
+    normalScale: new THREE.Vector2(0.28, 0.18),
+    side: THREE.DoubleSide
+  });
 }
 
 // ── Matemáticas Anatómicas "Sculpt" ──
@@ -744,6 +790,150 @@ function getMicroNormalTexture() {
   return _microNormalTex;
 }
 
+let _brandWrapTex = null;
+let _wrapAlphaTex = null;
+function getCssVar(name, fallback) {
+  if (typeof window === 'undefined' || !document?.documentElement) return fallback;
+  const val = getComputedStyle(document.documentElement).getPropertyValue(name);
+  return val ? val.trim() : fallback;
+}
+
+function invalidateWrapTextures() {
+  _brandWrapTex = null;
+}
+
+function getBrandWrapTexture() {
+  if (_brandWrapTex) return _brandWrapTex;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  const bg = getCssVar('--bg', '#080c12');
+  const panel = getCssVar('--panel', '#0c121c');
+  const accent = getCssVar('--accent', '#e8002d');
+  const accent2 = getCssVar('--accent2', '#ff6b35');
+
+  const base = ctx.createLinearGradient(0, 0, canvas.width, 0);
+  base.addColorStop(0, bg);
+  base.addColorStop(0.5, '#0d1520');
+  base.addColorStop(1, panel);
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (STATE.wrapGrid) {
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1;
+    const step = 40;
+    for (let x = 0; x <= canvas.width; x += step) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= canvas.height; y += step) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(canvas.width, y + 0.5);
+      ctx.stroke();
+    }
+  }
+
+  ctx.globalAlpha = 0.55;
+  const band = ctx.createLinearGradient(0, 0, canvas.width, 0);
+  band.addColorStop(0, accent);
+  band.addColorStop(0.6, accent2);
+  band.addColorStop(1, accent);
+  ctx.fillStyle = band;
+  ctx.fillRect(0, canvas.height * 0.48, canvas.width, canvas.height * 0.04);
+
+  ctx.globalAlpha = 0.2;
+  const glow = ctx.createRadialGradient(canvas.width * 0.5, canvas.height * 0.5, 20, canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.65);
+  glow.addColorStop(0, '#ffffff');
+  glow.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.globalAlpha = 1;
+
+  _brandWrapTex = new THREE.CanvasTexture(canvas);
+  _brandWrapTex.encoding = THREE.sRGBEncoding;
+  _brandWrapTex.wrapS = THREE.ClampToEdgeWrapping;
+  _brandWrapTex.wrapT = THREE.ClampToEdgeWrapping;
+  return _brandWrapTex;
+}
+
+function getWrapAlphaTexture() {
+  if (_wrapAlphaTex) return _wrapAlphaTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+
+  const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.12, 'rgba(255,255,255,0.55)');
+  grad.addColorStop(0.3, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.7, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.88, 'rgba(255,255,255,0.55)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  _wrapAlphaTex = new THREE.CanvasTexture(canvas);
+  _wrapAlphaTex.wrapS = THREE.ClampToEdgeWrapping;
+  _wrapAlphaTex.wrapT = THREE.ClampToEdgeWrapping;
+  return _wrapAlphaTex;
+}
+
+function rebuildLogoTexture() {
+  if (!STATE.logoImage) return;
+  const img = STATE.logoImage;
+  const imgW = img.naturalWidth || img.width || 1024;
+  const imgH = img.naturalHeight || img.height || 512;
+
+  const canvas = STATE.logoCanvas || document.createElement('canvas');
+  canvas.width = imgW;
+  canvas.height = imgH;
+  const ctx = canvas.getContext('2d');
+
+  ctx.clearRect(0, 0, imgW, imgH);
+  ctx.fillStyle = STATE.color1 || '#ffffff';
+  ctx.fillRect(0, 0, imgW, imgH);
+
+  if (STATE.wrapGrid) {
+    const brandTex = getBrandWrapTexture();
+    const brandCanvas = brandTex?.image;
+    if (brandCanvas) {
+      ctx.globalAlpha = 0.18;
+      const pattern = ctx.createPattern(brandCanvas, 'repeat');
+      if (pattern) {
+        ctx.fillStyle = pattern;
+        ctx.fillRect(0, 0, imgW, imgH);
+      }
+      ctx.globalAlpha = 1.0;
+    }
+  }
+
+  ctx.drawImage(img, 0, 0, imgW, imgH);
+
+  if (!STATE.logoTex) {
+    STATE.logoTex = new THREE.CanvasTexture(canvas);
+    STATE.logoTex.encoding = THREE.sRGBEncoding;
+    STATE.logoTex.center.set(0, 1);
+  } else {
+    STATE.logoTex.image = canvas;
+    STATE.logoTex.needsUpdate = true;
+  }
+  STATE.logoCanvas = canvas;
+}
+
+function getWrapTexture() {
+  return STATE.logoTex || getBrandWrapTexture();
+}
+
 // ── Ensamblaje del Bucal ───────────────────────────────────────
 function buildMouthguard() {
   if (guardGroup) {
@@ -765,6 +955,7 @@ function buildMouthguard() {
   if (STATE.viewMode === 'tripo') {
     const mats = createTripoMaterials(p);
     gripBaseMat = mats.outer;
+    const gelMat = createTripoGelMaterial(p);
 
     const tripoShape = createTripoShape(p);
     const tripoGeo = generateSweepGeometry(tripoShape, 800, p, true); // Ultra High Res
@@ -782,6 +973,15 @@ function buildMouthguard() {
     tripoInnerMesh.receiveShadow = true;
     tripoInnerMesh.renderOrder = 0;
     guardGroup.add(tripoInnerMesh);
+
+    const gelParams = getTripoGelParams(p);
+    const gelShape = createTripoShape(gelParams);
+    const gelGeo = generateSweepGeometry(gelShape, 800, gelParams, true);
+    const gelMesh = new THREE.Mesh(gelGeo, gelMat);
+    gelMesh.castShadow = true;
+    gelMesh.receiveShadow = true;
+    gelMesh.renderOrder = 2;
+    guardGroup.add(gelMesh);
   } else {
     const outerMat = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(p.color1),
@@ -853,18 +1053,25 @@ function buildMouthguard() {
   }
 
   // Piel Frontal (Full Wrap)
-  if (STATE.logoTex) {
+  const wrapTex = getWrapTexture();
+  if (wrapTex) {
     const wrapGeo = generateWrapGeometry(p);
+    const isDefaultWrap = !STATE.logoTex;
     const wrapMat = new THREE.MeshStandardMaterial({
-      map: STATE.logoTex,
-      transparent: true,
+      map: wrapTex,
+      transparent: isDefaultWrap,
+      opacity: isDefaultWrap ? 0.7 : 1.0,
+      alphaMap: isDefaultWrap ? getWrapAlphaTexture() : null,
       roughness: STATE.roughness,
       metalness: STATE.metalness,
       polygonOffset: true,
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1
     });
+    wrapMat.depthWrite = !isDefaultWrap;
+    wrapMat.depthTest = true;
     const wrapMesh = new THREE.Mesh(wrapGeo, wrapMat);
+    wrapMesh.renderOrder = 3;
     guardGroup.add(wrapMesh);
   }
 
@@ -940,6 +1147,8 @@ function applyPreset(pr) {
   STATE.color1 = pr.c1; STATE.color2 = pr.c2;
   STATE.metalness = pr.metal; STATE.roughness = pr.rough;
 
+  if (STATE.logoImage) rebuildLogoTexture();
+
   document.getElementById('color1-dot').style.background = pr.c1;
   document.getElementById('color1-hex').textContent = pr.c1.toUpperCase();
   document.getElementById('color2-dot').style.background = pr.c2;
@@ -1008,11 +1217,10 @@ function bindControls() {
       reader.onload = function(evt) {
         const img = new Image();
         img.onload = function() {
-          const texture = new THREE.Texture(img);
-          texture.encoding = THREE.sRGBEncoding;
-          texture.center.set(0, 1); // Origen Top-Left
-          texture.needsUpdate = true;
-          STATE.logoTex = texture;
+          STATE.logoImage = img;
+          STATE.logoCanvas = null;
+          STATE.logoTex = null;
+          rebuildLogoTexture();
           
           document.getElementById('crop-ui').style.display = 'block';
           document.getElementById('crop-img').src = evt.target.result;
@@ -1081,6 +1289,12 @@ function bindControls() {
   bindToggle('tog-vents', 'showVents');
   bindToggle('tog-tab', 'showTab');
   bindToggle('tog-ramps', 'showRamps');
+  bindToggle('tog-wrapgrid', 'wrapGrid', () => {
+    invalidateWrapTextures();
+    if (STATE.logoImage) rebuildLogoTexture();
+    const vp = document.getElementById('viewport');
+    if (vp) vp.classList.toggle('grid-off', !STATE.wrapGrid);
+  });
 
   document.getElementById('btn-front').addEventListener('click', () => setView('front'));
   document.getElementById('btn-side').addEventListener('click', () => setView('side'));
@@ -1109,6 +1323,7 @@ function bindColor(inputId, dotId, hexId, stateKey) {
     dot.style.background = e.target.value;
     hex.textContent = e.target.value.toUpperCase();
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    if (stateKey === 'color1' && STATE.logoImage) rebuildLogoTexture();
     buildMouthguard();
   });
 }
@@ -1125,11 +1340,12 @@ function bindSlider(inputId, valId, stateKey, unit, fmt) {
   });
 }
 
-function bindToggle(toggleId, stateKey) {
+function bindToggle(toggleId, stateKey, onChange) {
   const el = document.getElementById(toggleId);
   if (!el) return;
   el.addEventListener('change', e => {
     STATE[stateKey] = e.target.checked;
+    if (onChange) onChange();
     buildMouthguard();
   });
 }
