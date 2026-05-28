@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FightGuard Pro — Configurador de Bucal 3D Profesional</title>
+  <meta name="description" content="Configura tu bucal de boxeo profesional en 3D. Personaliza colores, tamaño, grip y logo."/>
+  <link rel="stylesheet" href="style.css"/>
+  <!-- Three.js r128 -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header id="header">
+    <div class="logo">
+      <div class="logo-icon">🥊</div>
+      <div>
+        <div class="logo-text">FIGHTGUARD PRO</div>
+        <div class="logo-sub">Configurador 3D · Bucal Profesional de Boxeo</div>
+      </div>
+    </div>
+    <div class="header-status">
+      <span class="status-dot"></span>
+      Visualizador en tiempo real
+    </div>
+  </header>
+
+  <!-- VIEWPORT -->
+  <main id="viewport">
+    <canvas id="canvas3d"></canvas>
+    <div id="view-buttons">
+      <button class="view-btn" id="btn-front">▣ Frente</button>
+      <button class="view-btn" id="btn-side">◧ Lateral</button>
+      <button class="view-btn" id="btn-top">⊡ Superior</button>
+      <button class="view-btn" id="btn-persp">⟡ Perspectiva</button>
+    </div>
+    <button id="autorotate-btn" class="active">
+      <span>↻</span><span class="ar-label">Auto ON</span>
+    </button>
+    <div id="controls-hint">
+      <div class="hint-item"><span class="hint-icon">🖱</span> Rotar</div>
+      <div class="hint-item"><span class="hint-icon">⚲</span> Zoom</div>
+      <div class="hint-item"><span class="hint-icon">⊞</span> Mover</div>
+    </div>
+    <div id="loading">
+      <div class="loader-ring"></div>
+      <div class="loader-text" id="loader-msg">Generando modelo 3D…</div>
+    </div>
+  </main>
+
+  <!-- PANEL -->
+  <aside id="panel">
+
+    <div class="panel-section">
+      <div class="section-title">Presets de Diseño</div>
+      <div class="presets-grid" id="presets-grid"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Colores</div>
+      <div class="color-row">
+        <div class="color-field">
+          <label>Color Principal</label>
+          <div class="color-wrapper" id="wrap-color1">
+            <div class="color-dot" id="color1-dot" style="background:#cc0a2a"></div>
+            <span class="color-hex" id="color1-hex">#CC0A2A</span>
+            <input type="color" id="inp-color1" value="#cc0a2a"/>
+          </div>
+        </div>
+        <div class="color-field">
+          <label>Color Secundario</label>
+          <div class="color-wrapper" id="wrap-color2">
+            <div class="color-dot" id="color2-dot" style="background:#1a0005"></div>
+            <span class="color-hex" id="color2-hex">#1A0005</span>
+            <input type="color" id="inp-color2" value="#1a0005"/>
+          </div>
+        </div>
+      </div>
+      <div class="slider-field">
+        <div class="slider-header"><span class="slider-label">Metalidad</span><span class="slider-value" id="val-metal">12%</span></div>
+        <input type="range" id="inp-metal" min="0" max="1" step="0.05" value="0.12"/>
+      </div>
+      <div class="slider-field">
+        <div class="slider-header"><span class="slider-label">Rugosidad</span><span class="slider-value" id="val-rough">45%</span></div>
+        <input type="range" id="inp-rough" min="0.1" max="1" step="0.05" value="0.45"/>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Tamaño y Ajuste</div>
+      <div class="slider-field">
+        <div class="slider-header"><span class="slider-label">Ancho del Arco</span><span class="slider-value" id="val-width">62mm</span></div>
+        <input type="range" id="inp-width" min="48" max="78" step="2" value="62"/>
+      </div>
+      <div class="slider-field">
+        <div class="slider-header"><span class="slider-label">Profundidad</span><span class="slider-value" id="val-depth">42mm</span></div>
+        <input type="range" id="inp-depth" min="32" max="54" step="2" value="42"/>
+      </div>
+      <div class="slider-field">
+        <div class="slider-header"><span class="slider-label">Altura del Bucal</span><span class="slider-value" id="val-height">13mm</span></div>
+        <input type="range" id="inp-height" min="8" max="18" step="1" value="13"/>
+      </div>
+      <div class="slider-field">
+        <div class="slider-header"><span class="slider-label">Pared Labial</span><span class="slider-value" id="val-labial">5mm</span></div>
+        <input type="range" id="inp-labial" min="3" max="8" step="0.5" value="5"/>
+      </div>
+      <div class="slider-field">
+        <div class="slider-header"><span class="slider-label">Ancho del Canal</span><span class="slider-value" id="val-channel">12mm</span></div>
+        <input type="range" id="inp-channel" min="8" max="16" step="1" value="12"/>
+      </div>
+      <div class="slider-field">
+        <div class="slider-header"><span class="slider-label">Prof. del Canal</span><span class="slider-value" id="val-chandepth">8mm</span></div>
+        <input type="range" id="inp-chandepth" min="4" max="12" step="1" value="8"/>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Características</div>
+      <div class="select-field">
+        <label>Patrón de Grip Oclusal</label>
+        <select id="sel-grip">
+          <option value="0">♦ Diamante</option>
+          <option value="1">≡ Líneas de Arco</option>
+          <option value="2">• Puntos</option>
+          <option value="3">⬜ Sin Patrón</option>
+        </select>
+      </div>
+      <div class="slider-field">
+        <div class="slider-header"><span class="slider-label">Nº Respiraderos</span><span class="slider-value" id="val-ventcount">3</span></div>
+        <input type="range" id="inp-ventcount" min="2" max="5" step="1" value="3"/>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">💨 Respiraderos</span>
+        <label class="toggle"><input type="checkbox" id="tog-vents" checked/><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">🦷 Rebordes de Mordida</span>
+        <label class="toggle"><input type="checkbox" id="tog-ramps" checked/><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">✋ Tab de Extracción</span>
+        <label class="toggle"><input type="checkbox" id="tog-tab" checked/><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- BOTTOM BAR -->
+  <footer id="bottom-bar">
+    <div class="bottom-info">
+      <span>Ancho: <span class="info-val" id="info-width">62 mm</span></span>
+      <span>Profundidad: <span class="info-val" id="info-depth">42 mm</span></span>
+      <span>Altura: <span class="info-val" id="info-height">13 mm</span></span>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-secondary" id="btn-reset">↺ Resetear</button>
+      <button class="btn btn-primary" id="btn-download">⬇ Descargar STL</button>
+    </div>
+  </footer>
+
+</div>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
